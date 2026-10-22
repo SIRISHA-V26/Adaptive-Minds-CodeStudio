@@ -1,0 +1,1045 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeStudio | Online Code Editor</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --editor-bg: #0d1117;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, sans-serif;
+    }
+
+    body.light {
+      --bg: #f6f8fa;
+      --panel: #ffffff;
+      --panel2: #f0f2f5;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --muted: #656d76;
+      --accent: #0969da;
+      --green: #1a7f37;
+      --red: #cf222e;
+      --yellow: #9a6700;
+      --editor-bg: #ffffff;
+    }
+
+    button, select, input, textarea { font: inherit; }
+
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 7px 11px;
+      transition: background .15s;
+    }
+
+    button:hover { background: var(--border); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    button.primary {
+      background: #238636;
+      border-color: #238636;
+      color: white;
+      font-weight: 600;
+    }
+
+    button.primary:hover { background: #2ea043; }
+
+    button.danger { color: var(--red); }
+
+    select, input, textarea {
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 9px;
+      outline: none;
+    }
+
+    select:focus, input:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      min-width: 320px;
+    }
+
+    header {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 15px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      font-size: 17px;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #58a6ff, #8957e5);
+      color: white;
+      font-weight: 700;
+    }
+
+    .brand small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    .header-actions, .toolbar, .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .header-actions { justify-content: flex-end; }
+
+    .toolbar {
+      min-height: 52px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .toolbar-group label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toolbar select { max-width: 160px; }
+
+    .workspace {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .editor-area {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tabs {
+      height: 39px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: stretch;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 13px;
+      white-space: nowrap;
+      border-right: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .tab.active {
+      background: var(--editor-bg);
+      color: var(--text);
+      border-top: 2px solid var(--accent);
+    }
+
+    .tab .close {
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .tab .close:hover { color: var(--red); }
+
+    #editor {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+    }
+
+    .side-panel {
+      width: 350px;
+      min-width: 280px;
+      max-width: 45%;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .panel-heading {
+      min-height: 43px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 13px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .panel-heading .muted {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .terminal {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    #terminalOutput {
+      flex: 1;
+      min-height: 120px;
+      overflow: auto;
+      padding: 13px;
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .terminal-input-area {
+      padding: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-label {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    #stdinInput {
+      width: 100%;
+      min-height: 75px;
+      resize: vertical;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+    }
+
+    .input-help {
+      font-size: 10px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .terminal-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 7px;
+    }
+
+    .statusbar {
+      min-height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 4px 12px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .status-left, .status-right {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      display: inline-block;
+      border-radius: 50%;
+      background: var(--green);
+      margin-right: 5px;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      padding: 10px 16px;
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      display: none;
+      box-shadow: 0 5px 20px #0003;
+      max-width: 90%;
+    }
+
+    #fileInput { display: none; }
+
+    @media (max-width: 850px) {
+      .workspace { flex-direction: column; }
+      .side-panel {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        height: 38%;
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+      .editor-area { min-height: 300px; }
+      header { align-items: flex-start; }
+      .header-actions { gap: 5px; }
+      .header-actions button { padding: 6px 8px; }
+      .toolbar { align-items: flex-start; }
+    }
+
+    @media (max-width: 520px) {
+      .brand small { display: none; }
+      header { padding: 8px; }
+      .toolbar { padding: 7px; }
+      .toolbar-group { gap: 5px; }
+      .toolbar button, .toolbar select { font-size: 11px; }
+      .side-panel { height: 42%; }
+      .status-right { display: none; }
+    }
+  </style>
+</head>
+
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand">
+      <div class="logo">&lt;/&gt;</div>
+      <div>
+        CodeStudio
+        <small>Online Coding Playground</small>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="newFileBtn" title="New file">＋ New</button>
+      <button id="openFileBtn" title="Open a local file">Open</button>
+      <button id="saveBtn" title="Save file (Ctrl+S)">Save</button>
+      <button id="themeBtn" title="Toggle theme">☼ Theme</button>
+      <button id="fullscreenBtn" title="Toggle fullscreen">⛶</button>
+      <input id="fileInput" type="file"
+        accept=".py,.js,.java,.c,.cpp,.h,.txt,.html,.css,.json" />
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <label for="languageSelect">Language</label>
+      <select id="languageSelect">
+        <option value="python">Python</option>
+        <option value="javascript">JavaScript</option>
+        <option value="java">Java</option>
+        <option value="c">C</option>
+        <option value="cpp">C++</option>
+      </select>
+
+      <label for="fontSizeSelect">Font</label>
+      <select id="fontSizeSelect">
+        <option value="12">12px</option>
+        <option value="13">13px</option>
+        <option value="14" selected>14px</option>
+        <option value="16">16px</option>
+        <option value="18">18px</option>
+        <option value="20">20px</option>
+      </select>
+    </div>
+
+    <div class="toolbar-group">
+      <button id="resetBtn" title="Restore sample code">Reset</button>
+      <button id="clearTerminalBtn" title="Clear terminal">Clear Terminal</button>
+      <button id="runBtn" class="primary" title="Run code (Ctrl+Enter)">▶ Run Code</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <main class="editor-area">
+      <div class="tabs" id="tabs"></div>
+      <div id="editor"></div>
+    </main>
+
+    <aside class="side-panel">
+      <div class="panel-heading">
+        <span>Terminal</span>
+        <span class="muted" id="terminalStatus">Ready</span>
+      </div>
+
+      <div class="terminal">
+        <pre id="terminalOutput">Welcome to CodeStudio.
+
+Select a language, write your code, enter any required input below, and click Run Code.
+
+Keyboard shortcuts:
+  Ctrl + Enter   Run code
+  Ctrl + S       Save file
+  Ctrl + F       Find
+  Ctrl + H       Replace</pre>
+
+        <div class="terminal-input-area">
+          <label class="input-label" for="stdinInput">
+            Standard input (stdin)
+          </label>
+
+          <textarea id="stdinInput"
+            placeholder="Enter program input here, one line at a time.&#10;Example for input():&#10;Sirisha&#10;21"></textarea>
+
+          <div class="input-help">
+            Enter all input your program needs before running it. Use separate
+            lines for separate input() calls or scanf() reads. This is
+            pre-supplied input, not live interactive terminal input.
+          </div>
+
+          <div class="terminal-buttons">
+            <button id="clearInputBtn">Clear Input</button>
+            <button id="exampleInputBtn">Example Input</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <div class="status-left">
+      <span><span class="status-dot"></span><span id="connectionStatus">Editor ready</span></span>
+      <span id="languageStatus">Python</span>
+    </div>
+    <div class="status-right">
+      <span id="cursorStatus">Ln 1, Col 1</span>
+      <span>UTF-8</span>
+      <span>Spaces: 4</span>
+    </div>
+  </footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const samples = {
+    python: `# Welcome to CodeStudio
+name = input("Enter your name: ")
+print("Hello,", name)
+`,
+    javascript: `// Welcome to CodeStudio
+// Use the stdin input box for programs that need input.
+const name = "Sirisha";
+console.log("Hello,", name);
+`,
+    java: `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        System.out.print("Enter your name: ");
+        String name = sc.nextLine();
+        System.out.println("Hello, " + name);
+        sc.close();
+    }
+}
+`,
+    c: `#include <stdio.h>
+
+int main(void) {
+    char name[100];
+    printf("Enter your name: ");
+
+    if (fgets(name, sizeof(name), stdin)) {
+        printf("Hello, %s", name);
+    }
+    return 0;
+}
+`,
+    cpp: `#include <iostream>
+#include <string>
+using namespace std;
+
+int main() {
+    string name;
+    cout << "Enter your name: ";
+    getline(cin, name);
+    cout << "Hello, " << name << endl;
+    return 0;
+}
+`
+  };
+
+  const languageNames = {
+    python: "Python",
+    javascript: "JavaScript",
+    java: "Java",
+    c: "C",
+    cpp: "C++"
+  };
+
+  const extensions = {
+    python: "py",
+    javascript: "js",
+    java: "java",
+    c: "c",
+    cpp: "cpp"
+  };
+
+  const monacoLanguages = {
+    python: "python",
+    javascript: "javascript",
+    java: "java",
+    c: "c",
+    cpp: "cpp"
+  };
+
+  let editor = null;
+  let darkTheme = true;
+  let fileCounter = 1;
+  let activeFileId = 1;
+  let files = [];
+  let isRunning = false;
+
+  function makeFile(language, name, content) {
+    return {
+      id: fileCounter++,
+      name,
+      language,
+      content,
+      viewState: null
+    };
+  }
+
+  files.push(makeFile("python", "main.py", samples.python));
+
+  function showToast(message) {
+    const toast = $("toast");
+    toast.textContent = message;
+    toast.style.display = "block";
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => {
+      toast.style.display = "none";
+    }, 2600);
+  }
+
+  function activeFile() {
+    return files.find(file => file.id === activeFileId);
+  }
+
+  function syncActiveFile() {
+    if (!editor) return;
+    const file = activeFile();
+    if (file) file.content = editor.getValue();
+  }
+
+  function renderTabs() {
+    const tabs = $("tabs");
+    tabs.replaceChildren();
+
+    files.forEach(file => {
+      const tab = document.createElement("div");
+      tab.className = "tab" + (file.id === activeFileId ? " active" : "");
+
+      const title = document.createElement("span");
+      title.textContent = file.name;
+      title.addEventListener("click", () => switchFile(file.id));
+
+      const close = document.createElement("span");
+      close.className = "close";
+      close.textContent = "×";
+      close.title = "Close file";
+      close.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closeFile(file.id);
+      });
+
+      tab.append(title, close);
+      tab.addEventListener("click", () => switchFile(file.id));
+      tabs.appendChild(tab);
+    });
+  }
+
+  function switchFile(id) {
+    syncActiveFile();
+
+    const previous = activeFile();
+    if (previous && editor) {
+      previous.viewState = editor.saveViewState();
+    }
+
+    activeFileId = id;
+    const file = activeFile();
+    if (!file) return;
+
+    $("languageSelect").value = file.language;
+    $("languageStatus").textContent = languageNames[file.language];
+
+    if (editor) {
+      editor.setValue(file.content);
+      monaco.editor.setModelLanguage(
+        editor.getModel(),
+        monacoLanguages[file.language]
+      );
+
+      if (file.viewState) {
+        editor.restoreViewState(file.viewState);
+      }
+    }
+
+    renderTabs();
+  }
+
+  function closeFile(id) {
+    if (files.length === 1) {
+      showToast("Keep at least one file open.");
+      return;
+    }
+
+    const index = files.findIndex(file => file.id === id);
+    if (index === -1) return;
+
+    const wasActive = id === activeFileId;
+    files.splice(index, 1);
+
+    if (wasActive) {
+      const next = files[Math.min(index, files.length - 1)];
+      activeFileId = next.id;
+      switchFile(next.id);
+    } else {
+      renderTabs();
+    }
+  }
+
+  function newFile() {
+    syncActiveFile();
+
+    const language = $("languageSelect").value;
+    const name = prompt(
+      "Enter a file name:",
+      "main." + extensions[language]
+    );
+
+    if (!name) return;
+
+    const file = makeFile(language, name, samples[language] || "");
+    files.push(file);
+    switchFile(file.id);
+    showToast("New file created.");
+  }
+
+  function saveFile() {
+    syncActiveFile();
+    const file = activeFile();
+    if (!file) return;
+
+    const blob = new Blob([file.content], {
+      type: "text/plain;charset=utf-8"
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    link.click();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast("File downloaded.");
+  }
+
+  function openFile(file) {
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      syncActiveFile();
+
+      const ext = file.name.split(".").pop().toLowerCase();
+      const extToLang = {
+        py: "python",
+        js: "javascript",
+        java: "java",
+        c: "c",
+        cpp: "cpp",
+        cc: "cpp",
+        cxx: "cpp"
+      };
+
+      const language = extToLang[ext] || $("languageSelect").value;
+      const existing = files.find(item => item.name === file.name);
+
+      if (existing) {
+        existing.content = String(reader.result);
+        existing.language = language;
+        switchFile(existing.id);
+      } else {
+        const newEntry = makeFile(
+          language,
+          file.name,
+          String(reader.result)
+        );
+        files.push(newEntry);
+        switchFile(newEntry.id);
+      }
+
+      showToast("File opened.");
+    };
+
+    reader.onerror = () => showToast("Could not read that file.");
+    reader.readAsText(file);
+  }
+
+  function setTerminal(text, append = false) {
+    const output = $("terminalOutput");
+    output.textContent = append
+      ? output.textContent + text
+      : text;
+
+    output.scrollTop = output.scrollHeight;
+  }
+
+  async function runCode() {
+    if (isRunning) return;
+
+    syncActiveFile();
+
+    const file = activeFile();
+    if (!file || !editor) return;
+
+    const source_code = editor.getValue();
+    const language = $("languageSelect").value;
+    const stdin = $("stdinInput").value;
+
+    if (!source_code.trim()) {
+      showToast("Write some code before running.");
+      return;
+    }
+
+    isRunning = true;
+    $("runBtn").disabled = true;
+    $("terminalStatus").textContent = "Running...";
+    $("connectionStatus").textContent = "Submitting code...";
+    setTerminal("Running " + languageNames[language] + "...\n\n");
+
+    try {
+      const response = await fetch("/api/code/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          source_code,
+          language,
+          stdin
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Execution request failed.");
+      }
+
+      let output = "";
+
+      if (result.stdout) output += result.stdout;
+
+      if (result.compile_output) {
+        output += "\n--- Compilation output ---\n";
+        output += result.compile_output;
+      }
+
+      if (result.stderr) {
+        output += "\n--- Error output ---\n";
+        output += result.stderr;
+      }
+
+      if (result.message) {
+        output += "\n" + result.message;
+      }
+
+      if (!output.trim()) {
+        output = "(No output)\n";
+      }
+
+      output += "\n\nStatus: " + (result.status || "Finished");
+
+      if (result.time != null) {
+        output += "\nExecution time: " + result.time + " s";
+      }
+
+      if (result.memory != null) {
+        output += "\nMemory used: " + result.memory + " KB";
+      }
+
+      setTerminal(output);
+      $("terminalStatus").textContent = result.status || "Finished";
+      $("connectionStatus").textContent = "Execution complete";
+    } catch (error) {
+      setTerminal(
+        "Execution error:\n" + error.message +
+        "\n\nCheck that the backend is running at the same origin and that its execution service is available."
+      );
+
+      $("terminalStatus").textContent = "Error";
+      $("connectionStatus").textContent = "Execution failed";
+    } finally {
+      isRunning = false;
+      $("runBtn").disabled = false;
+    }
+  }
+
+  function resetCode() {
+    const file = activeFile();
+    if (!file) return;
+
+    const confirmed = confirm(
+      "Replace the current file with the sample code for " +
+      languageNames[$("languageSelect").value] + "?"
+    );
+
+    if (!confirmed) return;
+
+    const language = $("languageSelect").value;
+    file.language = language;
+    file.name = "main." + extensions[language];
+    file.content = samples[language] || "";
+
+    editor.setValue(file.content);
+    monaco.editor.setModelLanguage(
+      editor.getModel(),
+      monacoLanguages[language]
+    );
+
+    $("languageStatus").textContent = languageNames[language];
+    renderTabs();
+    showToast("Sample code restored.");
+  }
+
+  function changeLanguage(language) {
+    syncActiveFile();
+
+    const file = activeFile();
+    if (!file) return;
+
+    file.language = language;
+    file.name = file.name.replace(/\.[^.]+$/, "." + extensions[language]);
+
+    monaco.editor.setModelLanguage(
+      editor.getModel(),
+      monacoLanguages[language]
+    );
+
+    $("languageStatus").textContent = languageNames[language];
+    renderTabs();
+  }
+
+  function toggleTheme() {
+    darkTheme = !darkTheme;
+    document.body.classList.toggle("light", !darkTheme);
+
+    if (editor) {
+      monaco.editor.setTheme(
+        darkTheme ? "vs-dark" : "vs"
+      );
+    }
+
+    $("themeBtn").textContent = darkTheme ? "☼ Theme" : "☾ Theme";
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        await $("app").requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {
+      showToast("Fullscreen is not available in this browser.");
+    }
+  }
+
+  require.config({
+    paths: {
+      vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs"
+    }
+  });
+
+  require(["vs/editor/editor.main"], function () {
+    editor = monaco.editor.create($("editor"), {
+      value: samples.python,
+      language: "python",
+      theme: "vs-dark",
+      automaticLayout: true,
+      fontFamily: "JetBrains Mono, monospace",
+      fontSize: 14,
+      minimap: { enabled: true },
+      scrollBeyondLastLine: false,
+      roundedSelection: true,
+      padding: { top: 14 },
+      tabSize: 4,
+      insertSpaces: true,
+      wordWrap: "on",
+      folding: true,
+      bracketPairColorization: { enabled: true },
+      suggestOnTriggerCharacters: true,
+      quickSuggestions: true,
+      renderWhitespace: "selection"
+    });
+
+    editor.onDidChangeCursorPosition(event => {
+      $("cursorStatus").textContent =
+        "Ln " + event.position.lineNumber +
+        ", Col " + event.position.column;
+    });
+
+    editor.onDidChangeModelContent(() => {
+      syncActiveFile();
+    });
+
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      runCode
+    );
+
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      saveFile
+    );
+
+    editor.focus();
+    renderTabs();
+  });
+
+  $("languageSelect").addEventListener("change", event => {
+    changeLanguage(event.target.value);
+  });
+
+  $("fontSizeSelect").addEventListener("change", event => {
+    if (editor) {
+      editor.updateOptions({
+        fontSize: Number(event.target.value)
+      });
+    }
+  });
+
+  $("runBtn").addEventListener("click", runCode);
+  $("newFileBtn").addEventListener("click", newFile);
+  $("saveBtn").addEventListener("click", saveFile);
+  $("openFileBtn").addEventListener("click", () => $("fileInput").click());
+  $("fileInput").addEventListener("change", event => {
+    openFile(event.target.files[0]);
+    event.target.value = "";
+  });
+
+  $("resetBtn").addEventListener("click", resetCode);
+  $("themeBtn").addEventListener("click", toggleTheme);
+  $("fullscreenBtn").addEventListener("click", toggleFullscreen);
+
+  $("clearTerminalBtn").addEventListener("click", () => {
+    setTerminal("");
+    $("terminalStatus").textContent = "Ready";
+  });
+
+  $("clearInputBtn").addEventListener("click", () => {
+    $("stdinInput").value = "";
+    showToast("Input cleared.");
+  });
+
+  $("exampleInputBtn").addEventListener("click", () => {
+    $("stdinInput").value = "Sirisha";
+    showToast("Example input added.");
+  });
+
+  window.addEventListener("keydown", event => {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key === "Enter"
+    ) {
+      event.preventDefault();
+      runCode();
+    }
+
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "s"
+    ) {
+      event.preventDefault();
+      saveFile();
+    }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    syncActiveFile();
+  });
+</script>
+</body>
+</html>
