@@ -1,0 +1,1052 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QueryStudio | Adaptive Minds</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+
+<style>
+:root {
+  --bg:#f3f5fb;--panel:#fff;--text:#172033;--muted:#64748b;
+  --border:#dfe4ee;--accent:#6554d9;--editor:#f8fafc;
+  --green:#16834a;--red:#dc3545;
+}
+body.dark {
+  --bg:#10131d;--panel:#191e2b;--text:#e7eaf3;--muted:#a0a9bd;
+  --border:#30384a;--accent:#9b8cff;--editor:#121724;
+  --green:#55d99b;--red:#ff737e;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:15px 22px;background:var(--panel);border-bottom:1px solid var(--border)}
+.brand{font-size:21px;font-weight:bold}
+.brand span{color:var(--accent)}
+.header-actions,.toolbar,.examples{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+button,select,input{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:white;border-color:var(--accent);font-weight:bold}
+button.danger{color:var(--red)}
+button:disabled{opacity:.6;cursor:wait}
+main{padding:20px;max-width:1600px;margin:auto}
+.intro{margin-bottom:18px}
+.intro h1{margin:0 0 7px;font-size:27px}
+.intro p{color:var(--muted);margin:0;line-height:1.5}
+.workspace{display:grid;grid-template-columns:minmax(250px,290px) minmax(0,1fr);gap:16px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0}
+.panel-title{padding:14px 16px;border-bottom:1px solid var(--border);font-weight:bold}
+.sidebar-section{padding:14px}
+.sidebar-section h3{margin:0 0 10px;font-size:14px}
+.muted{color:var(--muted);font-size:12px;line-height:1.5}
+.table-item{display:block;width:100%;text-align:left;margin:7px 0;padding:10px}
+.table-item strong{display:block;margin-bottom:4px}
+.table-item small{color:var(--muted)}
+.schema-list{list-style:none;margin:0;padding:0;font-size:13px}
+.schema-list li{padding:5px 0;color:var(--muted);overflow-wrap:anywhere}
+.schema-list b{color:var(--text)}
+.main-panel{display:flex;flex-direction:column}
+.db-manager{padding:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.db-manager label{font-size:12px;color:var(--muted)}
+.db-manager select{min-width:160px;max-width:100%}
+.db-manager .db-actions{display:flex;gap:7px;flex-wrap:wrap}
+.toolbar{padding:12px;border-bottom:1px solid var(--border)}
+.toolbar .spacer{flex:1}
+#sqlEditor{height:320px;width:100%;border-bottom:1px solid var(--border)}
+.editor-footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:9px 13px;color:var(--muted);border-top:1px solid var(--border);font-size:12px}
+.status{padding:10px 14px;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.status.success{color:var(--green)}
+.status.error{color:var(--red)}
+.results-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 14px;border-top:1px solid var(--border)}
+.results-heading h3{margin:0;font-size:15px}
+.table-wrap{overflow:auto;max-height:390px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--border);white-space:nowrap}
+th{background:var(--editor);position:sticky;top:0}
+.empty{padding:28px 15px;text-align:center;color:var(--muted);font-size:13px}
+.footer-note{color:var(--muted);font-size:12px;margin-top:14px;line-height:1.6}
+body.dark .monaco-editor,body.dark .monaco-editor .margin{background-color:#121724!important}
+@media(max-width:800px){
+  main{padding:12px}
+  .workspace{grid-template-columns:1fr}
+  #sqlEditor{height:270px}
+  header{padding:13px}
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="brand">🗄️ <span>QueryStudio</span>
+    <small style="font-size:12px;color:var(--muted)">| Adaptive Minds</small>
+  </div>
+  <div class="header-actions">
+    <button id="themeButton">🌙 Dark Mode</button>
+    <button id="homeButton">← Home</button>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <h1>SQL Practice Workspace</h1>
+    <p>Create separate databases, build tables, practise SQL queries, and explore your results.</p>
+  </div>
+
+  <div class="workspace">
+    <aside class="panel">
+      <div class="panel-title">📚 Database Explorer</div>
+
+      <div class="sidebar-section">
+        <h3>Tables in <span id="tableDbName">SampleDB</span></h3>
+        <div id="tableList">
+          <div class="empty">Loading tables...</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section" style="border-top:1px solid var(--border)">
+        <h3>Example Queries</h3>
+        <div class="examples" style="align-items:stretch;flex-direction:column">
+          <button data-example="all">SELECT all students</button>
+          <button data-example="where">Filter using WHERE</button>
+          <button data-example="order">Sort using ORDER BY</button>
+          <button data-example="aggregate">Average marks</button>
+          <button data-example="join">JOIN tables</button>
+          <button data-example="group">GROUP BY department</button>
+          <button data-example="insert">INSERT a student</button>
+          <button data-example="create">Create a table</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section" style="border-top:1px solid var(--border)">
+        <h3>Selected Database Schema</h3>
+        <ul class="schema-list" id="schemaList">
+          <li>Select a database to view its schema.</li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="panel main-panel">
+      <div class="panel-title">🗃️ Database Manager</div>
+
+      <div class="db-manager">
+        <label for="databaseSelect">Current database</label>
+        <select id="databaseSelect" aria-label="Select database" disabled>
+          <option>Loading...</option>
+        </select>
+        <div class="db-actions">
+          <button class="primary" id="createDbButton">＋ Create Database</button>
+          <button id="renameDbButton">Rename</button>
+          <button class="danger" id="deleteDbButton">Delete</button>
+        </div>
+      </div>
+
+      <div class="panel-title">⌨️ SQL Editor</div>
+
+      <div class="toolbar">
+        <button class="primary" id="runButton" disabled>▶ Run Query</button>
+        <button id="clearButton">Clear</button>
+        <button id="formatButton">Format SQL</button>
+        <div class="spacer"></div>
+        <label for="fontSize" class="muted">Font size</label>
+        <select id="fontSize">
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14" selected>14</option>
+          <option value="16">16</option>
+          <option value="18">18</option>
+          <option value="20">20</option>
+        </select>
+      </div>
+
+      <div id="sqlEditor"></div>
+
+      <div class="editor-footer">
+        <span>Ctrl + Enter: Run query · Ctrl + S: Download SQL</span>
+        <span id="dbStatus">Loading SQL engine...</span>
+      </div>
+
+      <div id="status" class="status">Initialising QueryStudio...</div>
+
+      <div class="results-heading">
+        <h3>📊 Query Results</h3>
+        <span id="resultCount" class="muted">No results yet</span>
+      </div>
+
+      <div id="results" class="table-wrap">
+        <div class="empty">Run a query to display its results here.</div>
+      </div>
+    </section>
+  </div>
+
+  <p class="footer-note">
+    Each named database is stored separately in this browser. Your changes are saved
+    automatically after queries run and are restored after refresh. Browser storage
+    can be cleared, and these databases do not automatically sync across devices or accounts.
+    An internet connection is required to load Monaco Editor and SQL.js.
+  </p>
+</main>
+
+<script>
+"use strict";
+
+const STORAGE_KEY = "adaptiveMinds.queryStudio.databases.v2";
+const ACTIVE_KEY = "adaptiveMinds.queryStudio.activeDatabase.v2";
+const THEME_KEY = "adaptiveMinds.queryStudio.theme.v1";
+const FONT_KEY = "adaptiveMinds.queryStudio.fontSize.v1";
+
+const $ = id => document.getElementById(id);
+
+const statusBox = $("status");
+const resultsBox = $("results");
+const resultCount = $("resultCount");
+const dbStatus = $("dbStatus");
+const runButton = $("runButton");
+const databaseSelect = $("databaseSelect");
+
+let db = null;
+let sqlEditor = null;
+let editorReady = false;
+let sqlModule = null;
+let busy = false;
+
+// Metadata and exported SQLite data for each named database.
+let databases = {};
+let activeDbName = null;
+
+const examples = {
+  all: "SELECT * FROM students;",
+  where: "SELECT name, department, marks\nFROM students\nWHERE marks >= 80;",
+  order: "SELECT name, marks\nFROM students\nORDER BY marks DESC;",
+  aggregate: "SELECT AVG(marks) AS average_marks,\n       MAX(marks) AS highest_marks,\n       MIN(marks) AS lowest_marks\nFROM students;",
+  join: "SELECT s.name, c.course_name, e.grade\nFROM enrollments e\nJOIN students s ON e.student_id = s.id\nJOIN courses c ON e.course_id = c.course_id;",
+  group: "SELECT department,\n       COUNT(*) AS student_count,\n       AVG(marks) AS average_marks\nFROM students\nGROUP BY department\nORDER BY average_marks DESC;",
+  insert: "INSERT INTO students (name, age, department, marks)\nVALUES ('New Student', 21, 'CSE', 85);\n\nSELECT * FROM students;",
+  create: "CREATE TABLE my_table (\n    id INTEGER PRIMARY KEY,\n    name TEXT NOT NULL\n);\n\nINSERT INTO my_table (name)\nVALUES ('Example');\n\nSELECT * FROM my_table;"
+};
+
+function setStatus(message, type = "") {
+  statusBox.textContent = message;
+  statusBox.className = "status" + (type ? " " + type : "");
+}
+
+function showEmptyResults(message, count = "No results yet") {
+  resultsBox.replaceChildren();
+  const div = document.createElement("div");
+  div.className = "empty";
+  div.textContent = message;
+  resultsBox.appendChild(div);
+  resultCount.textContent = count;
+}
+
+function showResults(columns, values) {
+  if (!columns || !columns.length) {
+    showEmptyResults(
+      "Query executed successfully. This statement does not return a result table.",
+      "Query completed"
+    );
+    return;
+  }
+
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+
+  columns.forEach(column => {
+    const th = document.createElement("th");
+    th.textContent = column;
+    headerRow.appendChild(th);
+  });
+
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+
+  values.forEach(row => {
+    const tr = document.createElement("tr");
+
+    row.forEach(value => {
+      const td = document.createElement("td");
+      td.textContent = value === null ? "NULL" : String(value);
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  resultsBox.replaceChildren(table);
+  resultCount.textContent =
+    `${values.length} row${values.length === 1 ? "" : "s"}`;
+}
+
+// Base64 helpers for SQL.js's exported Uint8Array.
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunkSize = 8192;
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
+    );
+  }
+
+  return btoa(binary);
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+function readStoredDatabases() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw);
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Invalid database storage format.");
+    }
+
+    return parsed;
+  } catch (error) {
+    console.error("Could not read saved databases:", error);
+    throw new Error(
+      "Saved database information could not be read. Browser storage may be blocked or corrupted."
+    );
+  }
+}
+
+function writeDatabaseCatalog() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(databases));
+    if (activeDbName) {
+      localStorage.setItem(ACTIVE_KEY, activeDbName);
+    }
+    return true;
+  } catch (error) {
+    console.error("Could not save databases:", error);
+    setStatus(
+      "Storage error: the database could not be saved. Browser storage may be full or disabled. Export important data before continuing.",
+      "error"
+    );
+    return false;
+  }
+}
+
+function saveActiveDatabase() {
+  if (!db || !activeDbName || !databases[activeDbName]) return false;
+
+  try {
+    const exported = db.export();
+    databases[activeDbName].data = bytesToBase64(exported);
+    databases[activeDbName].updatedAt = new Date().toISOString();
+
+    return writeDatabaseCatalog();
+  } catch (error) {
+    console.error("Database save failed:", error);
+    setStatus("Could not save this database: " + error.message, "error");
+    return false;
+  }
+}
+
+function makeSampleDatabase() {
+  const sample = new sqlModule.Database();
+
+  sample.run("PRAGMA foreign_keys = ON;");
+
+  sample.run(`
+    CREATE TABLE students (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      age INTEGER,
+      department TEXT,
+      marks INTEGER
+    );
+
+    CREATE TABLE courses (
+      course_id INTEGER PRIMARY KEY,
+      course_name TEXT NOT NULL,
+      credits INTEGER
+    );
+
+    CREATE TABLE enrollments (
+      enrollment_id INTEGER PRIMARY KEY,
+      student_id INTEGER,
+      course_id INTEGER,
+      grade TEXT,
+      FOREIGN KEY(student_id) REFERENCES students(id),
+      FOREIGN KEY(course_id) REFERENCES courses(course_id)
+    );
+
+    INSERT INTO students VALUES
+      (1,'Aarav',20,'CSE',88),
+      (2,'Diya',21,'ISE',92),
+      (3,'Rohan',20,'CSE',76),
+      (4,'Meera',22,'ECE',85),
+      (5,'Kiran',21,'ISE',69),
+      (6,'Ananya',20,'CSE',95),
+      (7,'Vikram',22,'ECE',73),
+      (8,'Nisha',21,'CSE',81);
+
+    INSERT INTO courses VALUES
+      (101,'Database Management Systems',4),
+      (102,'Computer Networks',3),
+      (103,'Data Structures',4),
+      (104,'Operating Systems',3);
+
+    INSERT INTO enrollments VALUES
+      (1,1,101,'A'),(2,1,103,'B'),
+      (3,2,101,'A'),(4,2,102,'A'),
+      (5,3,103,'B'),(6,4,104,'A'),
+      (7,5,102,'C'),(8,6,101,'A'),
+      (9,6,103,'A'),(10,7,104,'B'),
+      (11,8,101,'B'),(12,8,102,'A');
+  `);
+
+  return sample;
+}
+
+function createEmptyDatabaseObject() {
+  return new sqlModule.Database();
+}
+
+function getTableNames() {
+  if (!db) return [];
+
+  const result = db.exec(`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'table'
+      AND name NOT LIKE 'sqlite_%'
+    ORDER BY name;
+  `);
+
+  return result.length ? result[0].values.map(row => row[0]) : [];
+}
+
+function refreshExplorer() {
+  $("tableDbName").textContent = activeDbName || "None";
+
+  const tableList = $("tableList");
+  const schemaList = $("schemaList");
+
+  tableList.replaceChildren();
+  schemaList.replaceChildren();
+
+  if (!db) {
+    showExplorerMessage(tableList, "No database selected.");
+    showExplorerMessage(schemaList, "No database selected.");
+    return;
+  }
+
+  const tables = getTableNames();
+
+  if (!tables.length) {
+    showExplorerMessage(tableList, "No tables yet. Use CREATE TABLE to create one.");
+    showExplorerMessage(schemaList, "This database has no tables yet.");
+    return;
+  }
+
+  tables.forEach(tableName => {
+    const button = document.createElement("button");
+    button.className = "table-item";
+
+    const strong = document.createElement("strong");
+    strong.textContent = "📋 " + tableName;
+
+    const small = document.createElement("small");
+    const columnsResult = db.exec(
+      `PRAGMA table_info(${quoteIdentifier(tableName)});`
+    );
+
+    const columnNames = columnsResult.length
+      ? columnsResult[0].values.map(row => row[1])
+      : [];
+
+    small.textContent = columnNames.join(", ");
+
+    button.append(strong, small);
+    button.addEventListener("click", () => {
+      if (!sqlEditor) return;
+      sqlEditor.setValue(
+        `SELECT * FROM ${quoteIdentifier(tableName)};`
+      );
+      runQuery();
+      sqlEditor.focus();
+    });
+
+    tableList.appendChild(button);
+
+    const heading = document.createElement("li");
+    heading.style.marginTop = "9px";
+
+    const bold = document.createElement("b");
+    bold.textContent = tableName;
+    heading.appendChild(bold);
+    schemaList.appendChild(heading);
+
+    if (columnsResult.length) {
+      columnsResult[0].values.forEach(column => {
+        const li = document.createElement("li");
+        const columnName = column[1];
+        const type = column[2] || "ANY";
+        const primaryKey = column[5] ? ", primary key" : "";
+        const notNull = column[3] ? ", not null" : "";
+
+        li.textContent =
+          `${columnName} — ${type}${primaryKey}${notNull}`;
+        schemaList.appendChild(li);
+      });
+    }
+  });
+}
+
+function showExplorerMessage(container, message) {
+  const li = document.createElement("li");
+  li.textContent = message;
+  container.appendChild(li);
+}
+
+function quoteIdentifier(name) {
+  return '"' + String(name).replace(/"/g, '""') + '"';
+}
+
+function refreshDatabaseSelector() {
+  databaseSelect.replaceChildren();
+
+  Object.keys(databases).sort((a, b) => a.localeCompare(b)).forEach(name => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    databaseSelect.appendChild(option);
+  });
+
+  databaseSelect.value = activeDbName || "";
+  databaseSelect.disabled = busy || Object.keys(databases).length === 0;
+
+  $("renameDbButton").disabled = busy || !activeDbName;
+  $("deleteDbButton").disabled = busy || !activeDbName;
+  $("createDbButton").disabled = busy;
+}
+
+function validDatabaseName(name) {
+  return typeof name === "string" &&
+    name.trim().length > 0 &&
+    name.trim().length <= 50 &&
+    !/[\u0000-\u001F]/.test(name);
+}
+
+function setBusy(value) {
+  busy = value;
+  runButton.disabled = value || !db || !editorReady;
+  refreshDatabaseSelector();
+}
+
+function activateDatabase(name) {
+  if (!databases[name]) {
+    throw new Error("The selected database does not exist.");
+  }
+
+  if (db) {
+    saveActiveDatabase();
+    db.close();
+    db = null;
+  }
+
+  activeDbName = name;
+
+  const record = databases[name];
+
+  try {
+    if (record.data) {
+      db = new sqlModule.Database(base64ToBytes(record.data));
+    } else {
+      db = createEmptyDatabaseObject();
+    }
+
+    db.run("PRAGMA foreign_keys = ON;");
+    localStorage.setItem(ACTIVE_KEY, name);
+
+    refreshDatabaseSelector();
+    refreshExplorer();
+
+    if (sqlEditor) {
+      sqlEditor.setValue("SELECT * FROM students;");
+    }
+
+    showEmptyResults("Run a query to display its results here.");
+    setStatus(`Database "${name}" selected.`, "success");
+    dbStatus.textContent = "SQL engine ready · " + name;
+    runButton.disabled = !editorReady;
+  } catch (error) {
+    db = null;
+    setStatus("Could not open database: " + error.message, "error");
+    dbStatus.textContent = "Database unavailable";
+    refreshExplorer();
+    runButton.disabled = true;
+  }
+}
+
+function createDatabase(name, includeSampleData = false) {
+  name = name.trim();
+
+  if (!validDatabaseName(name)) {
+    setStatus(
+      "Enter a database name of 1–50 characters without control characters.",
+      "error"
+    );
+    return;
+  }
+
+  if (databases[name]) {
+    setStatus("A database with this name already exists.", "error");
+    return;
+  }
+
+  let newDb = null;
+
+  try {
+    newDb = includeSampleData
+      ? makeSampleDatabase()
+      : createEmptyDatabaseObject();
+
+    const exported = newDb.export();
+
+    databases[name] = {
+      data: bytesToBase64(exported),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (!writeDatabaseCatalog()) {
+      delete databases[name];
+      return;
+    }
+
+    newDb.close();
+    newDb = null;
+
+    activateDatabase(name);
+    setStatus(
+      includeSampleData
+        ? `Database "${name}" created with sample tables.`
+        : `Database "${name}" created successfully. Use CREATE TABLE to add tables.`,
+      "success"
+    );
+  } catch (error) {
+    if (newDb) newDb.close();
+    delete databases[name];
+    setStatus("Could not create database: " + error.message, "error");
+  }
+}
+
+function runQuery() {
+  if (!editorReady || !sqlEditor) {
+    setStatus("The SQL editor is still loading. Please wait.", "error");
+    return;
+  }
+
+  if (!db || !activeDbName) {
+    setStatus("Create or select a database first.", "error");
+    return;
+  }
+
+  const sql = sqlEditor.getValue().trim();
+
+  if (!sql) {
+    setStatus("Please enter an SQL query first.", "error");
+    return;
+  }
+
+  try {
+    const output = db.exec(sql);
+
+    // Persist even statements that do not return rows.
+    const saved = saveActiveDatabase();
+
+    refreshExplorer();
+
+    if (!output.length) {
+      showResults([], []);
+    } else {
+      const last = output[output.length - 1];
+      showResults(last.columns, last.values);
+    }
+
+    setStatus(
+      saved
+        ? `Query executed successfully in "${activeDbName}". Changes saved.`
+        : "Query executed, but saving failed. Export important data before leaving.",
+      saved ? "success" : "error"
+    );
+  } catch (error) {
+    // Multi-statement SQL can change the database before a later statement fails.
+    saveActiveDatabase();
+    refreshExplorer();
+
+    setStatus("SQL Error: " + error.message, "error");
+    showEmptyResults("Correct the SQL query and run it again.", "Query failed");
+  }
+}
+
+async function initialiseDatabase() {
+  if (busy) return;
+
+  setBusy(true);
+  dbStatus.textContent = "Loading SQL engine...";
+
+  try {
+    if (typeof initSqlJs !== "function") {
+      throw new Error(
+        "SQL.js did not load. Check your internet connection and refresh."
+      );
+    }
+
+    sqlModule = await initSqlJs({
+      locateFile: file =>
+        "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/" + file
+    });
+
+    databases = readStoredDatabases();
+
+    // Create a sample database only on the first visit.
+    if (!Object.keys(databases).length) {
+      const sample = makeSampleDatabase();
+
+      databases.SampleDB = {
+        data: bytesToBase64(sample.export()),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      sample.close();
+
+      if (!writeDatabaseCatalog()) {
+        throw new Error(
+          "Could not save the initial database. Check browser storage."
+        );
+      }
+    }
+
+    // Recover if the previously active database was deleted or renamed.
+    let preferredName = null;
+
+    try {
+      preferredName = localStorage.getItem(ACTIVE_KEY);
+    } catch (_) {}
+
+    activeDbName = databases[preferredName]
+      ? preferredName
+      : Object.keys(databases).sort((a, b) => a.localeCompare(b))[0];
+
+    activateDatabase(activeDbName);
+
+    dbStatus.textContent = "SQL engine ready";
+    runButton.disabled = !editorReady;
+  } catch (error) {
+    dbStatus.textContent = "SQL engine unavailable";
+    setStatus(error.message, "error");
+  } finally {
+    setBusy(false);
+    runButton.disabled = !db || !editorReady;
+  }
+}
+
+function initMonaco() {
+  if (typeof require !== "function") {
+    setStatus(
+      "Monaco Editor failed to load. Check your internet connection and refresh.",
+      "error"
+    );
+    return;
+  }
+
+  require.config({
+    paths: {
+      vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs"
+    }
+  });
+
+  window.MonacoEnvironment = {
+    getWorkerUrl: function() {
+      const proxy = `
+        self.MonacoEnvironment = {
+          baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/'
+        };
+        importScripts(
+          'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/base/worker/workerMain.js'
+        );
+      `;
+      return "data:text/javascript;charset=utf-8," + encodeURIComponent(proxy);
+    }
+  };
+
+  require(["vs/editor/editor.main"], function() {
+    monaco.languages.registerCompletionItemProvider("sql", {
+      provideCompletionItems: function() {
+        const words = [
+          "SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN",
+          "INNER JOIN", "GROUP BY", "ORDER BY", "HAVING",
+          "INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE FROM",
+          "CREATE TABLE", "ALTER TABLE", "DROP TABLE",
+          "COUNT", "AVG", "SUM", "MIN", "MAX",
+          "DISTINCT", "LIMIT", "AS", "AND", "OR",
+          "students", "courses", "enrollments"
+        ];
+
+        const suggestions = words.map(word => ({
+          label: word,
+          kind: monaco.languages.CompletionItemKind.Keyword,
+          insertText: word,
+          detail: "SQL"
+        }));
+
+        return { suggestions };
+      }
+    });
+
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme === "dark") {
+      document.body.classList.add("dark");
+      $("themeButton").textContent = "☀️ Light Mode";
+    }
+
+    const savedFont = Number(localStorage.getItem(FONT_KEY));
+    const fontSize = [12, 13, 14, 16, 18, 20].includes(savedFont)
+      ? savedFont
+      : 14;
+
+    $("fontSize").value = String(fontSize);
+
+    sqlEditor = monaco.editor.create($("sqlEditor"), {
+      value: "SELECT * FROM students;",
+      language: "sql",
+      theme: document.body.classList.contains("dark") ? "vs-dark" : "vs",
+      automaticLayout: true,
+      minimap: { enabled: false },
+      fontSize,
+      lineNumbers: "on",
+      roundedSelection: true,
+      scrollBeyondLastLine: false,
+      wordWrap: "on",
+      tabSize: 2,
+      suggestOnTriggerCharacters: true,
+      quickSuggestions: true,
+      padding: { top: 12, bottom: 12 }
+    });
+
+    editorReady = true;
+
+    sqlEditor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      runQuery
+    );
+
+    sqlEditor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      () => {
+        const blob = new Blob(
+          [sqlEditor.getValue()],
+          { type: "text/sql;charset=utf-8" }
+        );
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "query.sql";
+        link.click();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setStatus("SQL query downloaded as query.sql.", "success");
+      }
+    );
+
+    sqlEditor.addCommand(
+      monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+      () => sqlEditor.getAction("editor.action.formatDocument").run()
+    );
+
+    $("fontSize").addEventListener("change", event => {
+      const size = Number(event.target.value);
+      sqlEditor.updateOptions({ fontSize: size });
+      localStorage.setItem(FONT_KEY, String(size));
+    });
+
+    initialiseDatabase();
+  });
+}
+
+// Database manager events
+databaseSelect.addEventListener("change", () => {
+  const selected = databaseSelect.value;
+  if (!selected || selected === activeDbName) return;
+
+  activateDatabase(selected);
+});
+
+$("createDbButton").addEventListener("click", () => {
+  const name = prompt("Enter a name for your new database:", "CollegeDB");
+  if (name === null) return;
+
+  createDatabase(name);
+});
+
+$("renameDbButton").addEventListener("click", () => {
+  if (!activeDbName || !databases[activeDbName]) return;
+
+  const oldName = activeDbName;
+  const newName = prompt("Enter the new database name:", oldName);
+
+  if (newName === null) return;
+
+  const trimmed = newName.trim();
+
+  if (!validDatabaseName(trimmed)) {
+    setStatus("Enter a valid database name.", "error");
+    return;
+  }
+
+  if (trimmed === oldName) return;
+
+  if (databases[trimmed]) {
+    setStatus("A database with that name already exists.", "error");
+    return;
+  }
+
+  if (!saveActiveDatabase()) return;
+
+  databases[trimmed] = databases[oldName];
+  delete databases[oldName];
+  activeDbName = trimmed;
+
+  if (!writeDatabaseCatalog()) {
+    // Restore the in-memory catalog if saving fails.
+    databases[oldName] = databases[trimmed];
+    delete databases[trimmed];
+    activeDbName = oldName;
+    refreshDatabaseSelector();
+    return;
+  }
+
+  localStorage.setItem(ACTIVE_KEY, trimmed);
+  refreshDatabaseSelector();
+  refreshExplorer();
+  dbStatus.textContent = "SQL engine ready · " + trimmed;
+
+  setStatus(`Database renamed to "${trimmed}".`, "success");
+});
+
+$("deleteDbButton").addEventListener("click", () => {
+  if (!activeDbName || !databases[activeDbName]) return;
+
+  const name = activeDbName;
+  const names = Object.keys(databases);
+
+  if (names.length === 1) {
+    setStatus(
+      "You cannot delete the last database. Create another database first.",
+      "error"
+    );
+    return;
+  }
+
+  const confirmed = confirm(
+    `Permanently delete "${name}" and all its tables and data from this browser? This cannot be undone.`
+  );
+
+  if (!confirmed) return;
+
+  if (db) {
+    db.close();
+    db = null;
+  }
+
+  const oldRecord = databases[name];
+  delete databases[name];
+
+  const nextName = Object.keys(databases)
+    .sort((a, b) => a.localeCompare(b))[0];
+
+  activeDbName = nextName;
+
+  if (!writeDatabaseCatalog()) {
+    databases[name] = oldRecord;
+    activeDbName = name;
+
+    try {
+      db = new sqlModule.Database(base64ToBytes(oldRecord.data));
+    } catch (_) {}
+
+    refreshDatabaseSelector();
+    refreshExplorer();
+    return;
+  }
+
+  localStorage.setItem(ACTIVE_KEY, nextName);
+  activateDatabase(nextName);
+
+  setStatus(`Database "${name}" deleted.`, "success");
+});
+
+// Editor events
+runButton.addEventListener("click", runQuery);
+
+document.querySelectorAll("[data-example]").forEach(button => {
+  button.addEventListener("click", () => {
+    if (!sqlEditor) return;
+
+    sqlEditor.setValue(examples[button.dataset.example]);
+    sqlEditor.focus();
+  });
+});
+
+$("clearButton").addEventListener("click", () => {
+  if (!sqlEditor) return;
+  sqlEditor.setValue("");
+  sqlEditor.focus();
+});
+
+$("formatButton").addEventListener("click", () => {
+  if (!sqlEditor) return;
+  sqlEditor.getAction("editor.action.formatDocument").run();
+});
+
+$("themeButton").addEventListener("click", () => {
+  document.body.classList.toggle("dark");
+
+  const dark = document.body.classList.contains("dark");
+
+  $("themeButton").textContent = dark ? "☀️ Light Mode" : "🌙 Dark Mode";
+  localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+
+  if (window.monaco && sqlEditor) {
+    monaco.editor.setTheme(dark ? "vs-dark" : "vs");
+  }
+});
+
+$("homeButton").addEventListener("click", () => {
+  location.href = "/";
+});
+
+// Save the currently active database when the page is closed or refreshed.
+window.addEventListener("beforeunload", () => {
+  saveActiveDatabase();
+});
+
+initMonaco();
+</script>
+</body>
+</html>
